@@ -1,139 +1,107 @@
-from multiprocessing import connection
-from flask import Flask, render_template, request
-import sqlite3
+from flask import Flask
+from flask import render_template
+from flask import request
+from flask import url_for
+from PIL import Image
+import csv
+import pandas as pd
+from PIL import Image
+import base64
+import io
+from flask import Flask, request, render_template, redirect, url_for
+from werkzeug.utils import secure_filename
+from azure.storage.blob import BlobServiceClient
+import os
+from io import BytesIO
+from IPython.display import HTML
+
 
 app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='')
 
-@app.route('/')
-def index():
-   return render_template('index.html')
+app.config.from_pyfile('config.py')
+account = app.config['ACCOUNT_NAME']   # Azure account name
+key = app.config['ACCOUNT_KEY']      # Azure Storage account access key  
+connect_str = app.config['CONNECTION_STRING']
+container = app.config['CONTAINER'] # Container name
+allowed_ext = app.config['ALLOWED_EXTENSIONS'] # List of accepted extensions
 
-@app.route('/range_sal')
-def range_sal():
-   return render_template('range_sal.html')
+blob_service_client = BlobServiceClient.from_connection_string(connect_str)
 
-@app.route('/updatesalary')
-def updatesalary():
-   return render_template('updatesalary.html')
+@app.route('/', methods = ["GET","POST"])
+def Name():
+    photo_name = 'cat.jpg'
+    image = Image.open(photo_name)
+    data=io.BytesIO()
+    image.save(data,"JPEG")
+    encoded_img_data = base64.b64encode(data.getvalue())
+    p = encoded_img_data.decode('UTF-8')
+    return render_template("Name.html",photo_name=p)
 
-@app.route('/remove')
-def remove():
-   return render_template('remove.html')
+@app.route('/user', methods = ["POST"])
+def user():
+    df = pd.read_csv("data-1.csv",on_bad_lines='skip')
+    name = request.form["name"]
+    for i in df["name"]:
+        if i !=name:
+            next
+        elif i ==name:
+            pdict = zip(df.name,df.picture)
+            pdict=dict(pdict)
+            state = df[df["name"]==i]["class"].values[0]
+            print("{}'s class is {}".format(i,state)) 
+            photo_name = pdict[i]
+            image = Image.open(photo_name)
+            data=io.BytesIO()
+            image.save(data,"JPEG")
+            encoded_img_data = base64.b64encode(data.getvalue())
+            return render_template('user.html',user=name,state=state,photo_name=encoded_img_data.decode('utf-8')) 
+        return render_template('not_found.html')
 
-@app.route('/find')
-def find():
-   return render_template('find.html')
+@app.route('/get_salary', methods = ["GET", "POST"])
+def salary_input():
+    return render_template('get_salary.html')
 
-@app.route('/put_pic')
-def put_pic():
-   return render_template('put_pic.html')
-
-@app.route('/updatekey')
-def updatekey():
-   return render_template('updatekey.html')
-
-@app.route('/add_pic')
-def addpic():
-   return render_template('add_pic.html')
-
-@app.route('/all', methods=['POST','GET'])
-def full_list():
-    connection = sqlite3.connect('people.db')
-    cursor = connection.cursor()
-    querry="Select * from people "
-    cursor.execute(querry)
-    rows = cursor.fetchall()
-    connection.close()
-    return render_template("list.html",rows = rows)
-
-@app.route('/update_sal',methods=['POST','GET'])
-def update_sal():
-    if (request.method=='POST'):
-        connection = sqlite3.connect('people.db')
-        cursor = connection.cursor()
-        name= str(request.form['name'])
-        keyword= str(request.form['sal'])
-        querry="UPDATE people SET salary = '"+keyword+"'   WHERE Name ='"+name+"' "
-        cursor.execute(querry)
-        connection.commit()
-        querry2="Select * from people "
-        cursor.execute(querry2)
-        rows = cursor.fetchall()
-        connection.close()
-    return render_template("list.html",rows = rows)
-
-@app.route('/update_key',methods=['POST','GET'])
-def updatek():
-    if (request.method=='POST'):
-        connection = sqlite3.connect('people.db')
-        cursor = connection.cursor()
-        name= str(request.form['name'])
-        keyword= str(request.form['keyword'])
-        querry="UPDATE people SET keywords = '"+keyword+"'   WHERE Name ='"+name+"' "
-        cursor.execute(querry)
-        connection.commit()
-        querry2="Select * from people "
-        cursor.execute(querry2)
-        rows = cursor.fetchall()
-        connection.close()
-    return render_template("list.html",rows = rows)
-
-@app.route('/addpic',methods=['POST','GET'])
-def addpicture():
-    if (request.method=='POST'):
-        connection = sqlite3.connect('people.db')
-        currsor = connection.cursor()
-        name= str(request.form['name1'])
-        pic= str(request.form['pic1'])
-        querry="UPDATE people SET Picture = '"+pic+"'   WHERE Name ='"+name+"' "
-        currsor.execute(querry)
-        connection.commit()
-        querry2="Select * from people "
-        currsor.execute(querry2)
-        rows = currsor.fetchall()
-        connection.close()
-    return render_template("list.html",rows = rows)
-
-
-
-@app.route('/range_sal', methods=['GET', 'POST'])
-def notmatch():
-    if (request.method=='POST'):
-        connection = sqlite3.connect('people.db')
-        cursor = connection.cursor()
-        salrange= (request.form['range'])
-        querry="select * from people WHERE Salary  <"+salrange+""
-        cursor.execute(querry)
-        rows = cursor.fetchall()
-        connection.close()
-    return render_template("put_pic.html",rows = rows)
-
-@app.route('/remove_person', methods=['GET', 'POST'])
-def deleterecord():
-    if (request.method=='POST'):
-        connection = sqlite3.connect('people.db')
-        cursor = connection.cursor()
-        name= str(request.form['name'])
-        querry="DELETE FROM people WHERE Name ='"+name+"' "
-        cursor.execute(querry)
-        connection.commit()
-        querry2="Select * from people "
-        cursor.execute(querry2)
-        rows = cursor.fetchall()
-        connection.close()
-    return render_template("list.html",rows = rows)
-
-@app.route('/find_deets', methods=['POST','GET'])
-def list():
-    connection = sqlite3.connect('people.db')
-    cursor = connection.cursor()
-    field=str(request.form['name'])
-    querry="Select * from people WHERE Name =  '"+field+"' "
-    cursor.execute(querry)
-    rows = cursor.fetchall()
-    connection.close()
-    return render_template("put_pic.html",rows = rows)
-
-if __name__ =="__main__":
-    app.run(debug=True)
+@app.route('/salary', methods = ["POST"])
+def salary():
     
+    df_op = pd.DataFrame()
+    sal = request.form["sal"].isdigit()
+    sal1 = request.form["sal1"].isdigit()
+    df = pd.read_csv("data-1.csv",on_bad_lines='skip')
+    df = pd.read_csv("data-1.csv", converters={'income': int})
+    #df['income'] = df['income'].fillna(0)
+    #df['income'] = pd.to_numeric(df['income'])
+    df_op = df.loc[(df['num'] >= sal) & (df['num'] <= sal1)]
+    return render_template('salary.html',tables = [df_op.to_html()], titles=['name','income','comments'])
+
+@app.route('/nameinc', methods = ["GET", "POST"])
+def nameinc_input():
+    return render_template('nameinc.html')
+
+@app.route('/update', methods = ["GET", "POST"])
+def nameinc():
+    df = pd.read_csv("data-1.csv",on_bad_lines='skip')
+    df_op = pd.DataFrame()
+    name = request.form["name"]
+    year = request.form["sal1"]
+    comments = request.form["text"]
+    #df_op = df.loc[df.name == name, ['name','income', 'comments']] = name,inc, comments
+    df.loc[df.name == name, ['name','year', 'comments']] = name,year, comments
+    df.to_csv ("data-1.csv", index = None, header=True)
+    return render_template('update.html',name=name,tables=[df.to_html()],titles=['name','year','comments'],comments=comments)
+
+@app.route('/picture', methods = ["GET","POST"])
+def picture():
+
+    
+    df = pd.read_csv("data-1.csv",on_bad_lines='skip')
+    df.loc[df.picture == ' ', 'picture'] = 'No_Picture.jpg'
+    df.loc[df.picture == 'Nan', 'picture'] = 'No_Picture.jpg'
+    df.to_csv ("data-1.csv", index = None, header=True)
+    pdict = zip(df.name,df.picture)
+    pdict=dict(pdict)
+    return render_template("picture.html",tables=[df.to_html()],titles=['name','year','comments'],image_name=pdict)
+ 
+if __name__ == "__main__":
+    app.run(debug = True)
